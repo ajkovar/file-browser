@@ -1,41 +1,30 @@
-/*var sys = require('sys'),
-   http = require('http'),
-   fs = require('fs');
-
-http.createServer(function (req, res) {
-  	res.writeHead(200, {'Content-Type': 'text/html'});
-  	fs.readdir(".", function(err, files){
-		files.forEach(function(fileName){
-			res.write(fileName + "<br>")
-		})
-		res.end()
-	})
-
-  //res.end('Hello World\n');
-
-  
-}).listen(8124, "127.0.0.1");
-
-sys.puts('Server running at http://127.0.0.1:8124/');*/
+require.paths.unshift('./lib', './lib/express/lib', './lib/coffee/lib')
+require.paths.unshift()
 
 var sys = require('sys'),
 	fs = require('fs'),
-	kiwi = require('kiwi'),
-	pwd = __dirname;
+	pwd = __dirname
 
-kiwi.require('express');
+
+require('express')
+require('coffee') // coffeescript!
+
+require('express/plugins')
+
 
 configure(function() {
   set('root', __dirname); // required  for views
   enable('show exceptions');
-
-  require('express/plugins');
   use(Static); // required for public/[images, javascripts]
   use(Logger);
 });
 
-get('/*.css', function(file) {
+/*get('/*.css', function(file) {
   this.render(file + ".css.sass", { layout: false })
+})*/
+
+get('/styles.css', function(file) {
+  this.render("styles.css.sass", { layout: false })
 })
 
 get('/', function(){
@@ -59,36 +48,57 @@ get('/ls', function(){
 	var self = this
 	self.contentType('json')
 	
-	fs.readdir(pwd, function(err, fileNames){
-		var numberChecked = 0;
-		var files = []
-		
-		if(fileNames === undefined) {
-			sys.puts("List of filenames for directory " + pwd + " is coming back undefined.")
-			self.respond(200, JSON.stringify({result: []}))
-		}
-		else {
-			fileNames.forEach(function(fileName){
-				fs.stat(pwd+"/"+fileName, function(err, stat){
-				
-					if(stat===undefined) {
-						sys.puts(pwd+"/"+fileName + " is UNDEFINED :P")
-					}
-					files.push({
-						name: fileName,
-						isDirectory: stat.isDirectory()
-					})
+	var files = []
 
-					numberChecked++
-				
-					// all files have been stat'ed, return the result
-					if(numberChecked===fileNames.length) {
-						self.respond(200, JSON.stringify({result: files}))
-					}
-				})
-			})
-		}
-	})
+        fileBrowser = new FileBrowser(pwd)
+        fileBrowser.eachFile({
+                onFile: function(path){
+		    files.push({
+			    name: path,
+			    isDirectory: false
+		    })
+		},
+		onDirectory: function(path){
+		    files.push({
+			    name: path,
+			    isDirectory: true
+		    })
+		},
+                onFinish: function(){
+			self.respond(200, JSON.stringify({result: files}))
+                }
+        })
+	
+//	fs.readdir(pwd, function(err, fileNames){
+//			var numberChecked = 0;
+//		
+//			if(fileNames === undefined) {
+//				sys.puts("List of filenames for directory " + pwd + " is coming back undefined.")
+//				self.respond(200, JSON.stringify({result: []}))
+//			}
+//			else {
+//				fileNames.forEach(function(fileName){
+//					fs.stat(pwd+"/"+fileName, function(err, stat){
+//				
+//						if(stat===undefined) {
+//							sys.puts(directory+"/"+fileName + " is UNDEFINED :P")
+//						}
+//						files.push({
+//							name: fileName,
+//							isDirectory: stat.isDirectory()
+//						})
+//
+//						numberChecked++
+//				
+//						// all files have been stat'ed, return the result
+//						if(numberChecked===fileNames.length) {
+//							self.respond(200, JSON.stringify({result: files}))
+//						}
+//					})
+//				})
+//			}
+//		})
+	
 })
 
 get('/cd', function(){
@@ -121,13 +131,108 @@ get('/cd', function(){
 
 get('/open', function(){
 	var self = this,
-		fileName = this.param("fileName")
-	fs.readFile(pwd+"/"+fileName, 'ascii', function (err, data) {
+		fileName = this.param("fileName"),
+		path
+	
+	if(fileName[0]==="/") {
+		path = fileName
+	}
+	else path = pwd+"/"+fileName
+	
+	fs.readFile(path, 'ascii', function (err, data) {
 	  if (err) throw err;
-	sys.puts(data.constructor)  
-	self.respond(200, JSON.stringify({result: data}))
+		sys.puts(data.constructor)  
+		self.respond(200, JSON.stringify({result: data}))
 	});
 	
 })
 
-run()
+var server = run()
+
+var checked = {}
+
+var io = require('./lib/Socket.IO-node/lib/socket.io'),
+	sys = require("sys"),
+	FileBrowser = require("file-browser").FileBrowser
+
+io.listen(server, {
+	
+	onClientConnect: function(client){
+		sys.puts("watching " + __dirname)
+		fs.readdir(__dirname, function(err, fileNames){
+		
+			if(fileNames === undefined) {
+				sys.puts("List of filenames for directory " + pwd + " is coming back undefined.")
+			} 
+			else {
+			
+				fileNames.forEach(function(fileName){
+					var fullPath = __dirname + "/" + fileName;
+					
+				})
+			}
+		})
+		
+		fileBrowser = new FileBrowser(__dirname)
+		fileBrowser.eachFile({
+			recursive: true,
+			onFile: function(path){
+				fs.watchFile(path, function watcher(curr, prev) {
+				  sys.puts(path + " has changed."); /* 
+				  client.send('the current mtime is: ' + curr.mtime);
+				  client.send('the previous mtime was: ' + prev.mtime);*/
+				  	
+				  	if(!checked[path]) {
+					  	checked[path] = true
+					  	
+					  	//for some reason if you try to read the file while it is being watched, it throws file not found exception
+					  	// so unwatch it temporarily and the rewatch it when finished reading
+					  	//fs.unwatchFile(path) 
+					  	try {
+						  	fs.readFile(path, 'ascii', function (err, data) {
+								if (err) {
+									sys.puts("read file " + path + " failed for some reason. ")
+									// wtf? how the hell does it think this file doesnt exist
+									//throw err;
+								}
+								else {
+									client.send(JSON.stringify({path: path, data:data}));
+								}
+								//fs.watchFile(path, watcher)
+							});
+							//client.send(JSON.stringify({path: path, data:true}));
+						}
+						catch(e) {
+							sys.puts("read file " + path + " failed for some reason. ")
+						}
+					}
+					else client.send(JSON.stringify({path: path})) 
+				  
+				});
+			},
+			onFinish: function(){
+				sys.puts("Done scanning directory.")
+			}
+		})
+		
+		
+	},
+	
+	onClientDisconnect: function(client){
+		//client.broadcast("bye")
+		//client.broadcast(json({ announcement: client.sessionId + ' disconnected' }));
+	},
+	
+	onClientMessage: function(message, client){
+		//client.broadcast("message")
+		//sys.puts(client)
+		/*var msg = { message: [client.sessionId, message] };
+		buffer.push(msg);
+		if (buffer.length > 15) {
+			buffer.shift();
+		}
+		client.broadcast(json(msg));
+		*/
+	}
+	
+});
