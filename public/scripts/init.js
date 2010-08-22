@@ -13,45 +13,24 @@
 		socket.send('some data');
 		socket.addEvent('message', function(data){
 			var file = JSON.parse(data)
+
+			var directoryWatcher = new DirectoryWatcher()
+			if(!directoryWatcher.fileIsBeingWatched(file.path))
+				directoryWatcher.watchFile(file.path)
+			}
+
+			//directoryWatcher.getDiff({
+			//	file: file.path,
+			//	onReady: function(oldFile, newFile){
+
+			//	}
+			//})
 			
 			if(file.data) {
 				file.id=count++
 				fileCache[file.path] = file
 				
 				var changedFile = $("<div class='change-" + file.id + "'>" + file.path + "</div>").click(function(){
-					$.getJSON("/open", {
-							fileName: file.path
-						},
-						function(data){
-							
-							
-							
-							var base = difflib.stringAsLines(file.data);
-							var newtxt = difflib.stringAsLines(data.result);
-							
-							// create a SequenceMatcher instance that diffs the two sets of lines 
-							var sm = new difflib.SequenceMatcher(base, newtxt);
-							// get the opcodes from the SequenceMatcher instance
-							// opcodes is a list of 3-tuples describing what changes should be made to the base text
-							//      in order to yield the new text
-							var opcodes = sm.get_opcodes();
-							var contextSize = null;
-							
-							// build the diff view and add it to the current DOM
-							$(diffview.buildView({ 
-								baseTextLines:base,
-								newTextLines:newtxt,
-								opcodes:opcodes,
-								// set the display titles for each resource
-								baseTextName:"Base Text",
-								newTextName:"New Text",
-								contextSize:contextSize,
-								viewType: 0
-							})).appendTo("body");
-							//window.location = url + "#diff";
-							
-						}
-					)
 				})
 				
 				$('.file-changes').append(changedFile)
