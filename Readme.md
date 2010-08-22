@@ -1,7 +1,11 @@
 
-# YourLib
+# FileBrowser
 
-Description
+A simple file browser/watcher.  Lets you browse the file system of the
+server it runs on and inspect files with syntax highlighting. Also, alerts you
+when files change on the file system and allows you to view a diff of the files.
+Mainly just an experiment with a few different technologies including node, 
+coffeescript, websockets, and express.
 
 ## License 
 
