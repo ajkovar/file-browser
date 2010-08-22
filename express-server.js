@@ -69,36 +69,6 @@ get('/ls', function(){
                 }
         })
 	
-//	fs.readdir(pwd, function(err, fileNames){
-//			var numberChecked = 0;
-//		
-//			if(fileNames === undefined) {
-//				sys.puts("List of filenames for directory " + pwd + " is coming back undefined.")
-//				self.respond(200, JSON.stringify({result: []}))
-//			}
-//			else {
-//				fileNames.forEach(function(fileName){
-//					fs.stat(pwd+"/"+fileName, function(err, stat){
-//				
-//						if(stat===undefined) {
-//							sys.puts(directory+"/"+fileName + " is UNDEFINED :P")
-//						}
-//						files.push({
-//							name: fileName,
-//							isDirectory: stat.isDirectory()
-//						})
-//
-//						numberChecked++
-//				
-//						// all files have been stat'ed, return the result
-//						if(numberChecked===fileNames.length) {
-//							self.respond(200, JSON.stringify({result: files}))
-//						}
-//					})
-//				})
-//			}
-//		})
-	
 })
 
 get('/cd', function(){
@@ -159,24 +129,12 @@ io.listen(server, {
 	
 	onClientConnect: function(client){
 		sys.puts("watching " + __dirname)
-		fs.readdir(__dirname, function(err, fileNames){
-		
-			if(fileNames === undefined) {
-				sys.puts("List of filenames for directory " + pwd + " is coming back undefined.")
-			} 
-			else {
-			
-				fileNames.forEach(function(fileName){
-					var fullPath = __dirname + "/" + fileName;
-					
-				})
-			}
-		})
 		
 		fileBrowser = new FileBrowser(__dirname)
 		fileBrowser.eachFile({
 			recursive: true,
 			onFile: function(path){
+				sys.puts("watching " + path)
 				fs.watchFile(path, function watcher(curr, prev) {
 				  sys.puts(path + " has changed."); /* 
 				  client.send('the current mtime is: ' + curr.mtime);
